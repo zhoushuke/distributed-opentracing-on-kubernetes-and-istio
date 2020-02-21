@@ -1,0 +1,67 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: service-{{ service }}
+  labels:
+    app: service-{{ service }}
+    component: service
+    version: "{{ versions }}"
+spec:
+  ports:
+  - name: http2
+    port: 50051
+  selector:
+    app: service-{{ service }}
+    component: service
+    version: "{{ versions }}"
+---
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: service-{{ service }}
+  labels:
+    app: service-{{ service }}
+    component: service
+    version: "{{ versions }}"
+spec:
+  replicas: {{ replicas }}
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: service-{{ service }}
+      component: service
+      version: "{{ versions }}"
+  template:
+    metadata:
+      labels:
+        app: service-{{ service }}
+        component: service
+        version: "{{ versions }}"
+      annotations:
+        sidecar.istio.io/inject: "true"
+    spec:
+      containers:
+      - name: service-{{ service }}
+        image: garystafford/go-srv-{{ service }}:{{ versions }}
+        resources:
+        # requests:
+        #   memory: 100M
+        #   cpu: 100m
+        # limits:
+        #   memory: 250M
+        #   cpu: 250m
+        env:
+        - name: MONGO_CONN
+          valueFrom:
+            secretKeyRef:
+              name: go-srv-config
+              key: mongodb.conn
+        - name: RABBITMQ_CONN
+          valueFrom:
+            secretKeyRef:
+              name: go-srv-config
+              key: rabbitmq.conn
+        ports:
+        - containerPort: 50051
+        imagePullPolicy: IfNotPresent

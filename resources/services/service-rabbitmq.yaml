@@ -1,0 +1,51 @@
+apiVersion: apps/v1 
+kind: Deployment
+metadata:
+  labels:
+    app: rabbit
+    version: latest
+  name: rabbit
+  namespace: middle
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rabbit
+      version: latest
+  template:
+    metadata:
+      labels:
+        app: rabbit
+        version: latest 
+    spec:
+      containers:
+      - env:
+        - name: RABBITMQ_DEFAULT_USER
+          value: "root"
+        - name: RABBITMQ_DEFAULT_PASS
+          value: "VnximZWwED"
+        image: rabbitmq:latest  
+        imagePullPolicy: IfNotPresent
+        name: rabbit
+        ports:
+        - containerPort: 5672
+          name: tcp
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: rabbit
+    version: latest
+  name: rabbit
+  namespace: middle
+spec:
+  type: ClusterIP
+  clusterIP: None
+  ports:
+  - name: tcp
+    port: 5672
+    protocol: TCP
+    targetPort: 5672
+  selector:
+    app: rabbit
