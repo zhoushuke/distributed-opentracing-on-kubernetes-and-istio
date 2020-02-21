@@ -18,7 +18,7 @@ import (
 	"os"
 	"time"
 
-        gg "github.com/zhoushuke/grpc-gateway"
+        gg "github.com/zhoushuke/grpc-gateway-with-opentracing"
 	pb "github.com/garystafford/pb-greeting"
 )
 
