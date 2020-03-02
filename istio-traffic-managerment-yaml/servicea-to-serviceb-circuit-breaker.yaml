@@ -1,0 +1,43 @@
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: service-b-cb
+spec:
+  hosts:
+  - service-b
+  http:
+  - route:
+    - destination:
+        host: service-b
+        subset: v-blue
+      weight: 20
+    - destination:
+        host: service-b
+        subset: v-green
+      weight: 80
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: DestinationRule
+metadata:
+  name: service-b-cb
+spec:
+  host: service-b
+  subsets:
+    - name: v-blue
+      labels:
+        version: v-blue
+    - name: v-green
+      labels:
+        version: v-green
+      trafficPolicy:
+        connectionPool:
+          http:
+            http1MaxPendingRequests: 1
+            maxRequestsPerConnection: 1
+          tcp:
+            maxConnections: 1
+        outlierDetection:
+            baseEjectionTime: 10s
+            consecutiveErrors: 1
+            interval: 10s
+            maxEjectionPercent: 100

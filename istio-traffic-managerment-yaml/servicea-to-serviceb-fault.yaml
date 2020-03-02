@@ -1,0 +1,32 @@
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: service-b-fault
+spec:
+  hosts:
+  - service-b
+  http:
+  - fault:
+      abort:
+        httpStatus: 400
+        percentage:
+          value: 10.0
+    route:
+    - destination:
+        host: service-b
+        subset: v-green
+  - route:
+    - destination:
+        host: service-b
+        subset: v-green
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: DestinationRule
+metadata:
+  name: service-b-fault
+spec:
+  host: service-b
+  subsets:
+  - name: v-green
+    labels:
+      version: v-green

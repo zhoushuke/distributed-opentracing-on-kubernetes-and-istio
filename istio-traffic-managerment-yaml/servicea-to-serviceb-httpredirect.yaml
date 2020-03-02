@@ -1,0 +1,28 @@
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: service-a-redirect
+spec:
+  hosts:
+  - service-a
+  http:
+  - match:
+    - uri:
+        exact: "/api/v1/greeting"
+    redirect:
+      uri: /redirected
+  - route:
+    - destination:
+        host: service-a
+        subset: v1
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: DestinationRule
+metadata:
+  name: service-a-redirect
+spec:
+  host: service-a
+  subsets:
+  - name: v1
+    labels:
+      version: 1.5.2
