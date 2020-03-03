@@ -22,10 +22,11 @@ for namespace in ${NAMESPACES[@]}; do
   # Enable automatic Istio sidecar injection
   kubectl label namespace ${namespace} istio-injection=enabled
 
-  kubectl apply -n ${namespace} -f ../golang-srv-demo-secrets/secret/go-srv-demo.yaml
+  kubectl apply -n ${namespace} -f ./secret/go-srv-demo.yaml
 
   for service in ${SERVICES[@]}; do
-    kubectl apply -n ${namespace} -f ./resources/services/service-$service.yaml
+    kubectl apply -n ${namespace} -f ./services/service-$service.yaml
   done
-  #kubectl apply -n ${namespace} -f ./resources/services/angular-ui.yaml
+  kubectl apply -n ${namespace} -f ./services/service-mongo.yaml
+  kubectl apply -n ${namespace} -f ./services/service-rabbitmq.yaml
 done

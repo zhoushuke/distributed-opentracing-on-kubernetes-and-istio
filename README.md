@@ -1,24 +1,39 @@
-# Go-based Microservices Observability Demo with Istio
+# Kubernetes+Istio+GRPC-GATEWAY+RESTful+OPENTRACING
 
-**Successfully tested with Istio 1.1.3, released 4/15/2019**
+这个项目基于这个[项目]([garystafford/k8s-istio-observe-backend](https://github.com/garystafford/k8s-istio-observe-backend))改造而来，主要用于测试在Kubernetes+Istio微服务架构下，使用jaeger+kiali来可视化GRPC gateway与restful两种常用的服务间调用方式.
 
-The (8) Go-based RESTful microservices and (1) gRPC Gateway Reverse Proxy, which make up this reference distributed system platform, are designed to generate HTTP/JSON and gRPC/protobuf-based service-to-service, TCP-based service-to-database (MongoDB), and TCP-based service-to-queue-to-service (RabbitMQ) IPC (inter-process communication). Service A calls Service B and Service C, Service B calls Service D and Service E, Service D produces a message on a RabbitMQ queue that Service F consumes and writes to MongoDB, and so on. These distributed communications can be observed using Istio's observability tools, Jaeger, Kiali, Prometheus, and Grafana, when the system is deployed to Kubernetes with Istio.
+**这里主要进行的改变是grpc gateway服务集成到了服务内部, 在原项目中, gateway是被部署在单独的容器中**
 
-![Kiali](pics/kiaki_v2.png)
 
-## Optional Front-end UI
 
-An Angular 7 front-end UI to the API is located on Github: [k8s-istio-observe-frontend](https://github.com/garystafford/k8s-istio-observe-frontend).
+![](https://raw.githubusercontent.com/zhoushuke/BlogPhoto/master/githuboss/kiaki_v2.png)
 
-![preview](pics/ui_v3.png)
 
-## Architecture
 
-![Architecture Diagram](pics/architecture_v2.png)
+### 架构
 
-## Service Responses
+![](https://raw.githubusercontent.com/zhoushuke/BlogPhoto/master/githuboss/architecture_v2.png)
 
-On the reference platform, each upstream service responds to requests from downstream services by returning a small informational JSON payload (termed a greeting in the source code).
+通过jaeger在请求header中注入trace达到全链路追踪目的:
+
+```yaml
+var (
+        otHeaders = []string{
+                "x-request-id",
+                "x-b3-traceid",
+                "x-b3-spanid",
+                "x-b3-parentspanid",
+                "x-b3-sampled",
+                "x-b3-flags",
+                "x-ot-span-context"}
+)
+```
+
+
+
+### 响应信息
+
+服务间的代码没多大区别, response信息如下, 通过在response中指明所属service来反映服务提供者
 
 ```json
 {
@@ -29,28 +44,41 @@ On the reference platform, each upstream service responds to requests from downs
 }
 ```
 
-## Deployment
 
-The post, [Kubernetes-based Microservice Observability with Istio Service Mesh: Part 1](https://wp.me/p1RD28-6fL), outlines deploying the stack to Google Kubernetes Engine (GKE) on the Google Cloud Platform (GCP), with Istio 1.1.x and all associated telemetry components: Prometheus, Grafana, Zipkin, Jaeger, Service Graph, and Kiali.
 
-### Requirements
+### 部署
 
--   Docker
--   Helm
--   `gcloud` CLI
--   Istio 1.1.x
--   Jinja2 (pip install) - _optional_
+#### 前提
 
-### Optional: Build and Push Docker Images
+需要一个kubernetes集群,部署了istio及开启了jaeger和kiali, 这部分不在这里展开. 可参考[这里](https://izsk.me/2020/01/03/Istio-Install-Upon-Kubernetes/)
 
-All Docker images, references in the Docker Swarm and Kubernetes resource files, for the microservices and UI, are available on [Docker Hub](https://hub.docker.com/u/garystafford/). To build all images yourself, modify and use these two scripts.
+#### 编译镜像
 
 ```bash
-time bash part1_build_srv_images.sh
-time bash part2_push_images.sh
+cd services
+bash part1_build_srv_images.sh
 ```
 
-## Output from Service A via gRPC Gateway Reverse Proxy
+#### 镜像发布
+
+```bash
+cd resources
+bash part2_deploy_resources.sh
+```
+
+
+
+### 请求
+
+使用如下命令请求一条完整的路径
+
+```bash
+curl -H'Content-Type: application/json' 'your-service-a-svc-clusterIP:8088/api/v1/greeting'
+```
+
+其中**your-service-a-clusterIP**是真实环境下的集群地址
+
+请求返回的信息如下:
 
 ```json
 {
@@ -101,93 +129,21 @@ time bash part2_push_images.sh
 }
 ```
 
-## GKE Deployment
 
-### Optional: Build Kubernetes Deployment and Service Resources
 
-The Kubernetes Deployment and Service resources for (8) Go-based microservices were built using a common Jinja2 template (resources/services/templates/service.j2). To re-build the YAML files, run the following script.
+### 效果
 
-```bash
-cd golang-srv-demo/resources/services/templates
-python3 ./service-builder.py
-```
+jaeger上展示的效果如下:
 
-### Build and Deploy GKE Cluster
+![](https://raw.githubusercontent.com/zhoushuke/BlogPhoto/master/githuboss/jaeger.png)
 
-Build and deploy to a 3-node GKE Cluster, with Istio 1.1.x and all Istio telemetry components.
-Requires Istio 1.1.x is downloaded and available. Requires Helm to be available from the command-line, locally. Update constants in all scripts before running.
+kiali上展示的效果如下:
 
-```bash
-time bash part3_create_gke_cluster.sh
-export ISTIO_HOME && time bash part4_install_istio.sh
-time bash part5_deploy_resources.sh
+![](https://raw.githubusercontent.com/zhoushuke/BlogPhoto/master/githuboss/kiali.png)
 
-istioctl get all
-```
 
-## Install `hey`
 
-<https://github.com/rakyll/hey>
+### Istio流量管理
 
-```bash
-go get -u github.com/rakyll/hey
-cd go/src/github.com/rakyll/hey/
-go build
-./hey -n 500 -c 10 -h2 http://api.dev.example-api.com
-./hey -n 1000 -c 10 -h2 http://api.dev.example-api.com/api/greeting
-./hey -n 1000 -c 25 -h2 http://api.dev.example-api.com/api/greeting
-./hey -n 2000 -c 50 -h2 http://api.dev.example-api.com/api/greeting
-```
+在目录istio-traffic-managerment-yaml下有几个关于istio对流量管理的实践, 具体大家可参考[这里](https://izsk.me/2020/02/29/Istio-VirtualService-DestinationRule/)
 
-## Port Forward to Tools
-
-```bash
-# Jaeger
-kubectl port-forward -n istio-system \
-  $(kubectl get pod -n istio-system -l app=jaeger -o jsonpath='{.items[0].metadata.name}') \
-  16686:16686 &
-
-# Grafana
-kubectl port-forward -n istio-system \
-  $(kubectl get pod -n istio-system -l app=grafana -o jsonpath='{.items[0].metadata.name}') \
-  3000:3000 &
-
-# Prometheus
-kubectl -n istio-system port-forward \
-  $(kubectl -n istio-system get pod -l app=prometheus -o jsonpath='{.items[0].metadata.name}') \
-  9090:9090 &
-
-# Kiali
-kubectl -n istio-system port-forward \
-  $(kubectl -n istio-system get pod -l app=kiali -o jsonpath='{.items[0].metadata.name}') \
-  20001:20001 &
-```
-
-## Prometheus Query Examples
-
-```text
-up{namespace="dev",pod_name=~"service-.*"}
-
-container_memory_max_usage_bytes{namespace="dev",container_name="service-f"}
-container_memory_max_usage_bytes{namespace="dev",container_name=~"service-.*"}
-
-container_network_transmit_packets_total{namespace="dev",pod_name=~"service-e-.*"}
-
-istio_requests_total{destination_service_namespace="dev",connection_security_policy="mutual_tls",destination_app="service-a"}
-
-istio_response_bytes_count{destination_service_namespace="dev",connection_security_policy="mutual_tls",source_app="service-a"}
-```
-
-## Tear Down GKE Cluster
-
-```bash
-time bash ./part6_tear_down.sh
-```
-
-## References
-
--   <https://istio.io/docs/reference/config/installation-options/>
--   <https://github.com/istio/istio/tree/master/install/kubernetes/helm/istio>
--   <https://kubernetes.io/docs/concepts/overview/working-with-objects/common-labels/>
--   <https://thenewstack.io/make-a-restful-json-api-go/>
--   <https://github.com/istio/istio/blob/aa034934c7f2a2a265224061c066eae88a652703/install/kubernetes/helm/istio/README.md>
